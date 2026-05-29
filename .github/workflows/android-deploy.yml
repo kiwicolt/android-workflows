@@ -58,7 +58,8 @@ jobs:
 
       - name: Bump versionCode to CI run number
         run: |
-          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle
+          NEW_CODE=$(( 1000 + ${{ github.run_number }} ))
+          sed -i "s/versionCode [0-9]*/versionCode ${NEW_CODE}/" app/build.gradle
 
       - name: Build and upload release AAB
         env:
