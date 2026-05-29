@@ -1,0 +1,76 @@
+name: Android — Build & Deploy (reusable)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# This is a REUSABLE workflow.  It lives in github.com/YOUR-USERNAME/android-workflows
+# and is called by any Android app repo with a single 10-line file.
+#
+# Each app repo still needs these 5 GitHub Secrets:
+#   KEYSTORE_BASE64          base64-encoded .jks file
+#   KEYSTORE_PASSWORD        keystore password
+#   KEY_ALIAS                key alias inside the keystore
+#   KEY_PASSWORD             key password
+#   PLAY_SERVICE_ACCOUNT_JSON  contents of the Google Cloud service-account .json
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_call:
+    inputs:
+      track:
+        description: 'Play Store track to publish to'
+        required: false
+        type: string
+        default: 'internal'
+    secrets:
+      KEYSTORE_BASE64:
+        required: true
+      KEYSTORE_PASSWORD:
+        required: true
+      KEY_ALIAS:
+        required: true
+      KEY_PASSWORD:
+        required: true
+      PLAY_SERVICE_ACCOUNT_JSON:
+        required: true
+
+jobs:
+  deploy:
+    name: Build AAB and upload to Play Store
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/release.jks
+
+      - name: Write Play Store service account credentials
+        run: |
+          echo '${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}' > play-service-account.json
+
+      - name: Bump versionCode to CI run number
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle
+
+      - name: Build and upload release AAB
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew publishReleaseBundle --no-daemon
+
+      - name: Save AAB as downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-v${{ github.run_number }}.aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
