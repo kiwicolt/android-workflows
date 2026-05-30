@@ -56,10 +56,12 @@ jobs:
         run: |
           echo '${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}' > play-service-account.json
 
-      - name: Bump versionCode to CI run number
+      - name: Bump versionCode and stamp versionName with date
         run: |
           NEW_CODE=$(( 1000 + ${{ github.run_number }} ))
+          NEW_NAME="1.0.$(date -u '+%Y%m%d')-build${NEW_CODE}"
           sed -i "s/versionCode [0-9]*/versionCode ${NEW_CODE}/" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${NEW_NAME}\"/" app/build.gradle
 
       - name: Build and upload release AAB
         env:
